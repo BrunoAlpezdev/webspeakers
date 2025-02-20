@@ -1,64 +1,69 @@
 import { useEffect, useRef } from 'react'
 import socket from '../socket'
 
-async function getDesktopAudioStream() {
-    try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-            video: false,
-            audio: true, // Captura solo el audio del escritorio
-        })
-
-        const audioTracks = stream.getAudioTracks()
-        if (audioTracks.length === 0) {
-            console.warn('No se encontró audio en la captura de pantalla')
-            return null
-        }
-
-        return stream // Devuelve el stream con el audio del sistema
-    } catch (error) {
-        console.error('Error al capturar el audio del escritorio:', error)
-        return null
-    }
-}
-
 const Transmitter = () => {
     const peerConnection = useRef(new RTCPeerConnection())
 
     useEffect(() => {
         const pc = peerConnection.current
+        let stream
 
-        navigator.mediaDevices
-            .getDisplayMedia({
-                video: false,
-                audio: true, // Captura solo el audio del escritorio
-            })
-            .then((stream) => {
-                stream
-                    .getTracks()
-                    .forEach((track) => pc.addTrack(track, stream))
+        // Función para capturar el audio del escritorio
+        const startStreaming = async () => {
+            try {
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: false,
+                    audio: true, // Captura solo el audio del escritorio
+                })
 
+                const audioTracks = stream.getAudioTracks()
+                if (audioTracks.length === 0) {
+                    console.warn('No se encontró audio en la captura')
+                    return
+                }
+
+                audioTracks.forEach((track) => pc.addTrack(track, stream))
+
+                // Enviar candidatos ICE
                 pc.onicecandidate = (event) => {
                     if (event.candidate) {
                         socket.emit('ice-candidate', event.candidate)
                     }
                 }
 
-                pc.createOffer().then((offer) => {
-                    pc.setLocalDescription(offer)
-                    socket.emit('offer', offer)
-                })
-            })
+                // Crear oferta solo cuando ICE gathering haya terminado
+                const offer = await pc.createOffer()
+                await pc.setLocalDescription(offer)
 
+                socket.emit('offer', offer)
+            } catch (error) {
+                console.error(
+                    'Error al capturar el audio del escritorio:',
+                    error
+                )
+            }
+        }
+
+        startStreaming()
+
+        // Escuchar respuesta remota
         socket.on('answer', (answer) => {
-            pc.setRemoteDescription(new RTCSessionDescription(answer))
+            if (!pc.currentRemoteDescription) {
+                pc.setRemoteDescription(new RTCSessionDescription(answer))
+            }
         })
 
+        // Recibir candidatos ICE
         socket.on('ice-candidate', (candidate) => {
             pc.addIceCandidate(new RTCIceCandidate(candidate))
         })
 
         return () => {
+            // Cerrar conexión y detener tracks al desmontar
             pc.close()
+            if (stream) {
+                stream.getTracks().forEach((track) => track.stop())
+            }
         }
     }, [])
 
