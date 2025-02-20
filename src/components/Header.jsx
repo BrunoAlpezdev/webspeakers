@@ -15,14 +15,24 @@ export default function Header() {
                     Home
                 </NavLink>
                 <NavLink
-                    to="/sync"
+                    to="/transmitter"
                     className={({ isActive }) =>
                         isActive
                             ? 'transition-all text-yellow-100'
                             : 'transition-all'
                     }
                 >
-                    Sync
+                    Transmitter
+                </NavLink>
+                <NavLink
+                    to="/receiver"
+                    className={({ isActive }) =>
+                        isActive
+                            ? 'transition-all text-yellow-100'
+                            : 'transition-all'
+                    }
+                >
+                    Receiver
                 </NavLink>
             </nav>
         </div>
