@@ -12,8 +12,11 @@ const Transmitter = () => {
         const startStreaming = async () => {
             try {
                 stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
-                    audio: true,
+                    audio: {
+                        echoCancellation: true, // Elimina el eco
+                        noiseSuppression: true, // Reduce el ruido de fondo
+                        autoGainControl: true, // Ajusta automáticamente el volumen
+                    },
                 })
 
                 const audioTracks = stream.getAudioTracks()
@@ -22,6 +25,7 @@ const Transmitter = () => {
                     return
                 }
 
+                // Agregar los tracks de audio al peerConnection
                 audioTracks.forEach((track) => pc.addTrack(track, stream))
 
                 // Enviar candidatos ICE
@@ -31,11 +35,22 @@ const Transmitter = () => {
                     }
                 }
 
-                // Crear oferta solo cuando ICE gathering haya terminado
+                // Crear la oferta solo cuando ICE gathering haya terminado
                 const offer = await pc.createOffer()
                 await pc.setLocalDescription(offer)
 
                 socket.emit('offer', offer)
+
+                // Mejorar el bitrate de la conexión
+                pc.getSenders().forEach((sender) => {
+                    const params = sender.getParameters()
+                    if (params.encodings) {
+                        params.encodings.forEach((encoding) => {
+                            encoding.maxBitrate = 256000 // Ajuste el bitrate a 256 kbps
+                        })
+                    }
+                    sender.setParameters(params)
+                })
             } catch (error) {
                 console.error(
                     'Error al capturar el audio del escritorio:',
