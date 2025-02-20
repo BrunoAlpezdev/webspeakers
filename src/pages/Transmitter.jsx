@@ -12,8 +12,8 @@ const Transmitter = () => {
         const startStreaming = async () => {
             try {
                 stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: false,
-                    audio: true, // Captura solo el audio del escritorio
+                    video: true,
+                    audio: true,
                 })
 
                 const audioTracks = stream.getAudioTracks()
